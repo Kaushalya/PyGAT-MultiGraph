@@ -1,6 +1,14 @@
+import json
+from os import path
+
+import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 import torch
+from networkx.readwrite import json_graph
+from torch import tensor
+
+from utils.process_ppi import process_p2p
 
 
 def encode_onehot(labels):
@@ -45,6 +53,9 @@ def load_data(path="./data/cora/", dataset="cora"):
 
     return adj, features, labels, idx_train, idx_val, idx_test
 
+# TODO merge this to load_data
+def load_ppi_data(path="./data/ppi/", dataset="ppi"):
+    return process_p2p(path)
 
 def normalize_adj(mx):
     """Row-normalize sparse matrix"""
@@ -70,4 +81,3 @@ def accuracy(output, labels):
     correct = preds.eq(labels).double()
     correct = correct.sum()
     return correct / len(labels)
-
