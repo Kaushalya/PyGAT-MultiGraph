@@ -79,7 +79,7 @@ class SpGraphAttentionLayer(nn.Module):
     Sparse version GAT layer, similar to https://arxiv.org/abs/1710.10903
     """
 
-    def __init__(self, in_features, out_features, dropout, alpha, concat=True):
+    def __init__(self, in_features, out_features, dropout, alpha, concat=True, gpu=False):
         super(SpGraphAttentionLayer, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -95,6 +95,7 @@ class SpGraphAttentionLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.leakyrelu = nn.LeakyReLU(self.alpha)
         self.special_spmm = SpecialSpmm()
+        self.gpu = gpu
 
     def forward(self, input, adj):
         N = input.size()[0]
@@ -108,11 +109,17 @@ class SpGraphAttentionLayer(nn.Module):
         edge_h = torch.cat((h[edge[0, :], :], h[edge[1, :], :]), dim=1).t()
         # edge: 2*D x E
 
-        edge_e = torch.exp(-self.leakyrelu(self.a.mm(edge_h).squeeze()))
+        # TODO find a numerically stable way to perform softmax here
+        edge_e = torch.exp(-self.leakyrelu(self.a.mm(edge_h).squeeze())) + 1e-6
         assert not torch.isnan(edge_e).any()
         # edge_e: E
 
-        e_rowsum = self.special_spmm(edge, edge_e, torch.Size([N, N]), torch.ones(size=(N,1)).cuda())
+        b = torch.ones((N, 1))
+
+        if self.gpu:
+            b = b.cuda()
+
+        e_rowsum = self.special_spmm(edge, edge_e, torch.Size([N, N]), b)
         # e_rowsum: N x 1
 
         edge_e = self.dropout(edge_e)

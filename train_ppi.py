@@ -11,9 +11,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 
-from utils.preprocessing import load_data, accuracy, load_ppi_data
+from utils.metrics import fbeta_score
+from utils.preprocessing import load_ppi_data
 from utils.ppi_data import PpiData
 from models import GAT, SpGAT
 
@@ -41,6 +41,7 @@ parser.add_argument('--dropout', type=float, default=0.6,
 parser.add_argument('--alpha', type=float, default=0.2,
                     help='Alpha for the leaky_relu.')
 parser.add_argument('--patience', type=int, default=100, help='Patience')
+parser.add_argument('--data_dir', type=str, default='./data/ppi-toy-data')
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -51,11 +52,10 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-# Load data
-# adj, features, labels, idx_train, idx_val, idx_test = load_data()
 
-ppi_data = load_ppi_data('/Users/kaumad/Documents/coding/data/network_data/ppi/toy_data')
-n_feat = ppi_data.train_feat[0].shape[1]
+# load data
+ppi_data = load_ppi_data(args.data_dir)
+n_feat = ppi_data.train_feat.shape[2]
 n_classes = ppi_data.train_labels.shape[2]
 
 # Model and optimizer
@@ -80,18 +80,16 @@ optimizer = optim.Adam(model.parameters(),
 if args.cuda:
     model.cuda()
     ppi_data.to_device()
-    # features = features.cuda()
-    # adj = adj.cuda()
-    # labels = labels.cuda()
-    # idx_train = idx_train.cuda()
-    # idx_val = idx_val.cuda()
-    # idx_test = idx_test.cuda()
 
 # features, adj, labels = Variable(features), Variable(adj), Variable(labels)
-train_adj, train_feat, train_labels = Variable(ppi_data.train_adj), Variable(
-    ppi_data.train_feat), Variable(ppi_data.train_labels)
-val_adj, val_feat, val_labels = Variable(ppi_data.val_adj), Variable(
-    ppi_data.val_feat), Variable(ppi_data.val_labels)
+# train_adj, train_feat, train_labels = ppi_data.train_adj, ppi_data.train_feat, ppi_data.train_labels
+# val_adj, val_feat, val_labels = Variable(ppi_data.val_adj), Variable(ppi_data.val_feat), \
+#                                 Variable(ppi_data.val_labels)
+
+# train_labels = train_labels.argmax(dim=2)
+n_train = ppi_data.train_adj.shape[0]
+n_val = ppi_data.val_adj.shape[0]
+n_nodes = ppi_data.train_adj.shape[1]
 
 
 def train(epoch):
@@ -100,20 +98,23 @@ def train(epoch):
     optimizer.zero_grad()
 
     loss_train = 0.
-    acc_train = 0.
-    n_train = train_adj.shape[0]
-
+    # acc_train = 0.
+    f1_train = 0.
+    
+    # TODO use the masks
     for i in range(n_train):
-        output = model(train_feat[i], train_adj[i])
-        loss_train += F.nll_loss(output, train_labels[i])
-        acc_train += accuracy(output, train_labels[i])
+        # optimizer.zero_grad()
+        output = model(ppi_data.train_feat[i], ppi_data.train_adj[i])
+        loss_train += F.multilabel_margin_loss(output[ppi_data.tr_msk[i]],
+                                               ppi_data.train_labels[i][ppi_data.tr_msk[i]])
+        f1_train += fbeta_score(torch.exp(output)[ppi_data.tr_msk[i]],
+                                ppi_data.train_labels[i][ppi_data.tr_msk[i]], threshold=0.00827)
+        # loss_train.backward()
+        # optimizer.step()
 
     loss_train /= n_train
-    acc_train /= n_train
+    f1_train /= n_train
 
-    # output = model(features, adj)
-    # loss_train = F.nll_loss(output[idx_train], labels[idx_train])
-    # acc_train = accuracy(output[idx_train], labels[idx_train])
     loss_train.backward()
     optimizer.step()
 
@@ -124,24 +125,24 @@ def train(epoch):
     #     output = model(features, adj)
 
     loss_val = 0.
-    acc_val = 0.
+    f1_val = 0.
 
-    for i in range(len(val_adj)):
-        output = model(val_feat[i], val_adj[i])
-        loss_val += F.nll_loss(output, val_labels[i])
-        acc_val += accuracy(output, val_labels[i])
+    for i in range(len(ppi_data.val_adj)):
+        output = model(ppi_data.val_feat[i], ppi_data.val_adj[i])
+        loss_val += F.multilabel_margin_loss(output, ppi_data.val_labels[i])
+        f1_val += fbeta_score(output, ppi_data.val_labels[i], threshold=0.00827)
 
-    loss_val /= len(train_adj)
-    acc_val /= len(train_adj)
+    loss_val /= n_val
+    f1_val /= n_val
 
     # loss_val = F.nll_loss(output[idx_val], labels[idx_val])
     # acc_val = accuracy(output[idx_val], labels[idx_val])
 
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_train: {:.4f}'.format(loss_train.item()),
-          'acc_train: {:.4f}'.format(acc_train.item()),
+          'f1_train: {:.4f}'.format(f1_train.item()),
           'loss_val: {:.4f}'.format(loss_val.item()),
-          'acc_val: {:.4f}'.format(acc_val.item()),
+          'f1_val: {:.4f}'.format(f1_val.item()),
           'time: {:.4f}s'.format(time.time() - t))
 
     return loss_val.item()

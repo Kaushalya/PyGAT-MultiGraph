@@ -53,9 +53,11 @@ def load_data(path="./data/cora/", dataset="cora"):
 
     return adj, features, labels, idx_train, idx_val, idx_test
 
+
 # TODO merge this to load_data
 def load_ppi_data(path="./data/ppi/", dataset="ppi"):
     return process_p2p(path)
+
 
 def normalize_adj(mx):
     """Row-normalize sparse matrix"""
@@ -75,9 +77,3 @@ def normalize_features(mx):
     mx = r_mat_inv.dot(mx)
     return mx
 
-
-def accuracy(output, labels):
-    preds = output.max(1)[1].type_as(labels)
-    correct = preds.eq(labels).double()
-    correct = correct.sum()
-    return correct / len(labels)
