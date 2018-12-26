@@ -96,19 +96,17 @@ def train(epoch):
     t = time.time()
     model.train()
     optimizer.zero_grad()
-
     loss_train = 0.
     # acc_train = 0.
     f1_train = 0.
-    
-    # TODO use the masks
+
     for i in range(n_train):
         # optimizer.zero_grad()
-        output = model(ppi_data.train_feat[i], ppi_data.train_adj[i])
-        loss_train += F.multilabel_margin_loss(output[ppi_data.tr_msk[i]],
-                                               ppi_data.train_labels[i][ppi_data.tr_msk[i]])
-        f1_train += fbeta_score(torch.exp(output)[ppi_data.tr_msk[i]],
-                                ppi_data.train_labels[i][ppi_data.tr_msk[i]], threshold=0.00827)
+        node_mask = ppi_data.tr_msk[i].byte()
+        output = model(ppi_data.train_feat[i], ppi_data.train_adj[i])[node_mask, ]
+        target_labels = ppi_data.train_labels[i, node_mask]
+        loss_train += F.multilabel_margin_loss(output, target_labels)
+        f1_train += fbeta_score(torch.exp(output), target_labels, threshold=0.00827)
         # loss_train.backward()
         # optimizer.step()
 
@@ -118,25 +116,19 @@ def train(epoch):
     loss_train.backward()
     optimizer.step()
 
-    # if not args.fastmode:
-    #     # Evaluate validation set performance separately,
-    #     # deactivates dropout during validation run.
-    #     model.eval()
-    #     output = model(features, adj)
-
+    # calculation of validation loss
     loss_val = 0.
     f1_val = 0.
 
     for i in range(len(ppi_data.val_adj)):
-        output = model(ppi_data.val_feat[i], ppi_data.val_adj[i])
-        loss_val += F.multilabel_margin_loss(output, ppi_data.val_labels[i])
-        f1_val += fbeta_score(output, ppi_data.val_labels[i], threshold=0.00827)
+        val_mask = ppi_data.vl_msk[i].byte()
+        output = model(ppi_data.val_feat[i], ppi_data.val_adj[i])[val_mask, ]
+        target_labels = ppi_data.val_labels[i, val_mask]
+        loss_val += F.multilabel_margin_loss(output, target_labels)
+        f1_val += fbeta_score(torch.exp(output), target_labels, threshold=0.00827)
 
     loss_val /= n_val
     f1_val /= n_val
-
-    # loss_val = F.nll_loss(output[idx_val], labels[idx_val])
-    # acc_val = accuracy(output[idx_val], labels[idx_val])
 
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_train: {:.4f}'.format(loss_train.item()),

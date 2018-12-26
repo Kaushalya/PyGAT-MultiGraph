@@ -99,7 +99,7 @@ def train(epoch):
           'acc_val: {:.4f}'.format(acc_val.item()),
           'time: {:.4f}s'.format(time.time() - t))
 
-    return loss_val.item()
+    return loss_train.item()
 
 
 def compute_test():
