@@ -19,6 +19,10 @@ def fbeta_score(preds, targs, beta=1., threshold=0.5):
     beta2 = beta * beta
     num = (1 + beta2) * prec * rec
     denom = beta2 * (prec + rec)
+
+    if denom == 0:
+        return 0.
+
     return num/denom
 
 

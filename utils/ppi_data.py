@@ -1,6 +1,6 @@
 class PpiData:
-    def __init__(self, train_adj,val_adj,test_adj,train_feat,val_feat,test_feat,train_labels,val_labels,
-     test_labels, train_nodes, val_nodes, test_nodes, tr_msk, vl_msk, ts_msk):
+    def __init__(self, train_adj, val_adj, test_adj, train_feat, val_feat, test_feat, train_labels, val_labels,
+                 test_labels, train_nodes, val_nodes, test_nodes, tr_msk, vl_msk, ts_msk):
         self.train_adj = train_adj
         self.val_adj = val_adj
         self.test_adj = test_adj

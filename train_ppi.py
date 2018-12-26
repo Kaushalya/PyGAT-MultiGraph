@@ -81,12 +81,6 @@ if args.cuda:
     model.cuda()
     ppi_data.to_device()
 
-# features, adj, labels = Variable(features), Variable(adj), Variable(labels)
-# train_adj, train_feat, train_labels = ppi_data.train_adj, ppi_data.train_feat, ppi_data.train_labels
-# val_adj, val_feat, val_labels = Variable(ppi_data.val_adj), Variable(ppi_data.val_feat), \
-#                                 Variable(ppi_data.val_labels)
-
-# train_labels = train_labels.argmax(dim=2)
 n_train = ppi_data.train_adj.shape[0]
 n_val = ppi_data.val_adj.shape[0]
 n_nodes = ppi_data.train_adj.shape[1]
@@ -105,7 +99,7 @@ def train(epoch):
         node_mask = ppi_data.tr_msk[i].byte()
         output = model(ppi_data.train_feat[i], ppi_data.train_adj[i])[node_mask, ]
         target_labels = ppi_data.train_labels[i, node_mask]
-        loss_train += F.multilabel_margin_loss(output, target_labels)
+        loss_train += F.multilabel_soft_margin_loss(output, target_labels.float())
         f1_train += fbeta_score(torch.exp(output), target_labels, threshold=0.00827)
         # loss_train.backward()
         # optimizer.step()
