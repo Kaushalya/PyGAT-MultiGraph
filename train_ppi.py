@@ -13,9 +13,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from utils.metrics import fbeta_score
-from utils.preprocessing import load_ppi_data
+from utils.preprocessing import load_ppi_data, str_to_list
 from utils.ppi_data import PpiData
-from models import GAT, SpGAT
+from models import GAT, SpGAT, SpGAT_inductive
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -32,9 +32,9 @@ parser.add_argument('--lr', type=float, default=0.005,
                     help='Initial learning rate.')
 parser.add_argument('--weight_decay', type=float, default=5e-4,
                     help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=8,
+parser.add_argument('--hidden', type=str, default='8',
                     help='Number of hidden units.')
-parser.add_argument('--nb_heads', type=int, default=8,
+parser.add_argument('--nb_heads', type=str, default='8',
                     help='Number of head attentions.')
 parser.add_argument('--dropout', type=float, default=0.6,
                     help='Dropout rate (1 - keep probability).')
@@ -57,21 +57,22 @@ if args.cuda:
 ppi_data = load_ppi_data(args.data_dir)
 n_feat = ppi_data.train_feat.shape[2]
 n_classes = ppi_data.train_labels.shape[2]
-
+n_heads = str_to_list(args.nb_heads, dtype=int)
+n_hidden = str_to_list(args.hidden, dtype=int)
 # Model and optimizer
 if args.sparse:
-    model = SpGAT(nfeat=n_feat,
-                  nhid=args.hidden,
+    model = SpGAT_inductive(nfeat=n_feat,
+                  nhid=n_hidden,
                   nclass=n_classes,
                   dropout=args.dropout,
-                  nheads=args.nb_heads,
+                  nheads=n_heads,
                   alpha=args.alpha)
 else:
     model = GAT(nfeat=n_feat,
-                nhid=args.hidden,
+                nhid=n_hidden,
                 nclass=n_classes,
                 dropout=args.dropout,
-                nheads=args.nb_heads,
+                nheads=n_heads,
                 alpha=args.alpha)
 optimizer = optim.Adam(model.parameters(),
                        lr=args.lr,
@@ -83,7 +84,9 @@ if args.cuda:
 
 n_train = ppi_data.train_adj.shape[0]
 n_val = ppi_data.val_adj.shape[0]
+n_test = ppi_data.test_adj.shape[0]
 n_nodes = ppi_data.train_adj.shape[1]
+f1_threshold = 0.00827
 
 
 def train(epoch):
@@ -100,7 +103,7 @@ def train(epoch):
         output = model(ppi_data.train_feat[i], ppi_data.train_adj[i])[node_mask, ]
         target_labels = ppi_data.train_labels[i, node_mask]
         loss_train += F.multilabel_soft_margin_loss(output, target_labels.float())
-        f1_train += fbeta_score(torch.exp(output), target_labels, threshold=0.00827)
+        f1_train += fbeta_score(torch.exp(output), target_labels, threshold=f1_threshold)
         # loss_train.backward()
         # optimizer.step()
 
@@ -119,7 +122,7 @@ def train(epoch):
         output = model(ppi_data.val_feat[i], ppi_data.val_adj[i])[val_mask, ]
         target_labels = ppi_data.val_labels[i, val_mask]
         loss_val += F.multilabel_margin_loss(output, target_labels)
-        f1_val += fbeta_score(torch.exp(output), target_labels, threshold=0.00827)
+        f1_val += fbeta_score(torch.exp(output), target_labels, threshold=f1_threshold)
 
     loss_val /= n_val
     f1_val /= n_val
@@ -135,14 +138,20 @@ def train(epoch):
 
 
 def compute_test():
-    raise NotImplementedError()
-    # model.eval()
-    # output = model(features, adj)
-    # loss_test = F.nll_loss(output[idx_test], labels[idx_test])
-    # acc_test = accuracy(output[idx_test], labels[idx_test])
-    # print("Test set results:",
-    #       "loss= {:.4f}".format(loss_test.item()),
-    #       "accuracy= {:.4f}".format(acc_test.item()))
+    model.eval()
+    loss_test = 0.
+    f1_test = 0.
+
+    for i in range(n_test):
+        test_mask = ppi_data.ts_msk[i].byte()
+        output = model(ppi_data.test_feat[i], ppi_data.test_adj[i])[test_mask, ]
+        target_labels = ppi_data.test_labels[i, test_mask]
+        loss_test += F.multilabel_margin_loss(output, target_labels)
+        f1_test += fbeta_score(torch.exp(output), target_labels, threshold=f1_threshold)
+
+    print("Test set results:",
+          "loss= {:.4f}".format(loss_test.item()),
+          "F1-test= {:.4f}".format(f1_test.item()))
 
 
 # Train model
@@ -186,4 +195,4 @@ model.load_state_dict(torch.load('{}.pkl'.format(best_epoch)))
 
 # Testing
 # TODO fix testing code
-# compute_test()
+compute_test()

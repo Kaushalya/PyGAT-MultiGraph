@@ -1,12 +1,6 @@
-import json
-from os import path
-
-import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 import torch
-from networkx.readwrite import json_graph
-from torch import tensor
 
 from utils.process_ppi import process_p2p
 
@@ -76,4 +70,8 @@ def normalize_features(mx):
     r_mat_inv = sp.diags(r_inv)
     mx = r_mat_inv.dot(mx)
     return mx
+
+
+def str_to_list(str, dtype=int):
+    return [dtype(c.strip()) for c in str.split(',')]
 
