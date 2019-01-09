@@ -99,7 +99,7 @@ class SpGAT_inductive(nn.Module):
 
 class GCN(nn.Module):
     def __init__(self, n_feat, n_classes, dropout, ch_list=None):
-        """Dense version of GAT."""
+        """Implementation of Graph Convolutional Networks (Kipf and Welling, ICLR 2017)"""
         super(GCN, self).__init__()
         ch_list = ch_list or [n_feat, 256, 128]
         self.dropout = dropout

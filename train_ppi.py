@@ -25,6 +25,8 @@ parser.add_argument('--fastmode', action='store_true',
                     default=False, help='Validate during training pass.')
 parser.add_argument('--sparse', action='store_true',
                     default=False, help='GAT with sparse version or not.')
+parser.add_argument('--model', default='gat', choices=['gat', 'gcn'],
+                    help='Name of the model. Either GAT or GCN.')
 parser.add_argument('--seed', type=int, default=72, help='Random seed.')
 parser.add_argument('--epochs', type=int, default=10000,
                     help='Number of epochs to train.')
@@ -60,22 +62,23 @@ n_classes = ppi_data.train_labels.shape[2]
 n_heads = str_to_list(args.nb_heads, dtype=int)
 n_hidden = str_to_list(args.hidden, dtype=int)
 # Model and optimizer
-if args.sparse:
-    model = SpGAT_inductive(nfeat=n_feat,
-                  nhid=n_hidden,
-                  nclass=n_classes,
-                  dropout=args.dropout,
-                  nheads=n_heads,
-                  alpha=args.alpha)
-else:
-    model = GAT(nfeat=n_feat,
-                nhid=n_hidden,
-                nclass=n_classes,
-                dropout=args.dropout,
-                nheads=n_heads,
-                alpha=args.alpha)
-
-model = GCN(n_feat, n_classes, args.dropout)
+if args.model == 'gat':
+    if args.sparse:
+        model = SpGAT_inductive(nfeat=n_feat,
+                      nhid=n_hidden,
+                      nclass=n_classes,
+                      dropout=args.dropout,
+                      nheads=n_heads,
+                      alpha=args.alpha)
+    else:
+        model = GAT(nfeat=n_feat,
+                    nhid=n_hidden,
+                    nclass=n_classes,
+                    dropout=args.dropout,
+                    nheads=n_heads,
+                    alpha=args.alpha)
+elif args.model == 'gcn':
+    model = GCN(n_feat, n_classes, args.dropout)
 optimizer = optim.Adam(model.parameters(),
                        lr=args.lr,
                        weight_decay=args.weight_decay)
