@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from layers import GraphAttentionLayer, SpGraphAttentionLayer
+from layers import GraphAttentionLayer, SpGraphAttentionLayer, GraphLinearLayer
 
 
 class GAT(nn.Module):
@@ -23,7 +23,7 @@ class GAT(nn.Module):
         x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
         x = F.dropout(x, self.dropout, training=self.training)
         x = F.elu(self.out_att(x, adj))
-        return F.log_softmax(x, dim=1)
+        return torch.sigmoid(x, dim=1)
 
 
 class SpGAT(nn.Module):
@@ -51,7 +51,7 @@ class SpGAT(nn.Module):
         x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
         x = F.dropout(x, self.dropout, training=self.training)
         x = F.elu(self.out_att(x, adj))
-        return F.log_softmax(x, dim=1)
+        return torch.sigmoid(x, dim=1)
 
 
 class SpGAT_inductive(nn.Module):
@@ -94,5 +94,23 @@ class SpGAT_inductive(nn.Module):
         x = torch.cat([att(x, adj).view(-1, self.n_classes, 1) for
                        att in self.out_attentions], dim=2)
         logits = torch.mean(x, dim=2)
-        return F.log_softmax(F.elu(logits), dim=1)
+        return torch.sigmoid(F.elu(logits), dim=1)
 
+
+class GCN(nn.Module):
+    def __init__(self, n_feat, n_classes, dropout, ch_list=None):
+        """Dense version of GAT."""
+        super(GCN, self).__init__()
+        ch_list = ch_list or [n_feat, 256, 128]
+        self.dropout = dropout
+        self.gconvs = [GraphLinearLayer(ch_list[i], ch_list[i+1]) for i in range(len(ch_list)-1)]
+        self.lin = GraphLinearLayer(ch_list[-1], n_classes)
+        for i, gconv in enumerate(self.gconvs):
+            self.add_module('gconv_{}'.format(i), gconv)
+
+    def forward(self, x, adj):
+        # x = F.dropout(x, self.dropout, training=self.training)
+        for gconv in self.gconvs:
+            x = F.relu(gconv(x, adj))
+        h = self.lin(x, adj)
+        return torch.sigmoid(h)

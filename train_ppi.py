@@ -15,7 +15,7 @@ import torch.optim as optim
 from utils.metrics import fbeta_score
 from utils.preprocessing import load_ppi_data, str_to_list
 from utils.ppi_data import PpiData
-from models import GAT, SpGAT, SpGAT_inductive
+from models import GAT, SpGAT, SpGAT_inductive, GCN
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -74,6 +74,8 @@ else:
                 dropout=args.dropout,
                 nheads=n_heads,
                 alpha=args.alpha)
+
+model = GCN(n_feat, n_classes, args.dropout)
 optimizer = optim.Adam(model.parameters(),
                        lr=args.lr,
                        weight_decay=args.weight_decay)
@@ -86,7 +88,7 @@ n_train = ppi_data.train_adj.shape[0]
 n_val = ppi_data.val_adj.shape[0]
 n_test = ppi_data.test_adj.shape[0]
 n_nodes = ppi_data.train_adj.shape[1]
-f1_threshold = 0.00827
+f1_threshold = 0.5
 
 
 def train(epoch):
@@ -102,8 +104,8 @@ def train(epoch):
         node_mask = ppi_data.tr_msk[i].byte()
         output = model(ppi_data.train_feat[i], ppi_data.train_adj[i])[node_mask, ]
         target_labels = ppi_data.train_labels[i, node_mask]
-        loss_train += F.multilabel_soft_margin_loss(output, target_labels.float())
-        f1_train += fbeta_score(torch.exp(output), target_labels, threshold=f1_threshold)
+        loss_train += F.binary_cross_entropy(output, target_labels.float())
+        f1_train += fbeta_score(output, target_labels, threshold=f1_threshold)
         # loss_train.backward()
         # optimizer.step()
 
@@ -121,8 +123,8 @@ def train(epoch):
         val_mask = ppi_data.vl_msk[i].byte()
         output = model(ppi_data.val_feat[i], ppi_data.val_adj[i])[val_mask, ]
         target_labels = ppi_data.val_labels[i, val_mask]
-        loss_val += F.multilabel_margin_loss(output, target_labels)
-        f1_val += fbeta_score(torch.exp(output), target_labels, threshold=f1_threshold)
+        loss_val += F.binary_cross_entropy(output, target_labels.float())
+        f1_val += fbeta_score(output, target_labels, threshold=f1_threshold)
 
     loss_val /= n_val
     f1_val /= n_val
@@ -148,6 +150,9 @@ def compute_test():
         target_labels = ppi_data.test_labels[i, test_mask]
         loss_test += F.multilabel_margin_loss(output, target_labels)
         f1_test += fbeta_score(torch.exp(output), target_labels, threshold=f1_threshold)
+
+    loss_test /= n_test
+    f1_test /= n_test
 
     print("Test set results:",
           "loss= {:.4f}".format(loss_test.item()),

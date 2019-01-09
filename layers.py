@@ -142,3 +142,20 @@ class SpGraphAttentionLayer(nn.Module):
 
     def __repr__(self):
         return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
+
+
+class GraphLinearLayer(nn.Module):
+    def __init__(self, in_features, out_features, gpu=False):
+        super(GraphLinearLayer, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.gpu = gpu
+        # self.dropout = nn.Dropout(dropout)
+        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
+        nn.init.xavier_normal_(self.W.data, gain=1.414)
+
+    def forward(self, x, adj):
+        # h: N x out
+        h = torch.mm(adj, x)
+        h = torch.mm(h, self.W)
+        return h
