@@ -23,7 +23,7 @@ class GAT(nn.Module):
         x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
         x = F.dropout(x, self.dropout, training=self.training)
         x = F.elu(self.out_att(x, adj))
-        return torch.sigmoid(x, dim=1)
+        return torch.sigmoid(x)
 
 
 class SpGAT(nn.Module):
@@ -51,7 +51,7 @@ class SpGAT(nn.Module):
         x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
         x = F.dropout(x, self.dropout, training=self.training)
         x = F.elu(self.out_att(x, adj))
-        return torch.sigmoid(x, dim=1)
+        return torch.sigmoid(x)
 
 
 class SpGAT_inductive(nn.Module):
@@ -94,7 +94,7 @@ class SpGAT_inductive(nn.Module):
         x = torch.cat([att(x, adj).view(-1, self.n_classes, 1) for
                        att in self.out_attentions], dim=2)
         logits = torch.mean(x, dim=2)
-        return torch.sigmoid(F.elu(logits), dim=1)
+        return torch.sigmoid(logits)
 
 
 class GCN(nn.Module):
