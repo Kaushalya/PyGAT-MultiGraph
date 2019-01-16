@@ -56,7 +56,7 @@ class SpGAT(nn.Module):
 
 class SpGAT_inductive(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
-        """Sparse version of GAT."""
+        """Sparse version of GAT with three Graph Attention layers."""
         super(SpGAT_inductive, self).__init__()
         self.dropout = dropout
         self.n_classes = nclass

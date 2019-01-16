@@ -151,8 +151,8 @@ def compute_test():
         test_mask = ppi_data.ts_msk[i].byte()
         output = model(ppi_data.test_feat[i], ppi_data.test_adj[i])[test_mask, ]
         target_labels = ppi_data.test_labels[i, test_mask]
-        loss_test += F.multilabel_margin_loss(output, target_labels)
-        f1_test += fbeta_score(torch.exp(output), target_labels, threshold=f1_threshold)
+        loss_test += F.binary_cross_entropy(output, target_labels.float())
+        f1_test += fbeta_score(output, target_labels, threshold=f1_threshold)
 
     loss_test /= n_test
     f1_test /= n_test
