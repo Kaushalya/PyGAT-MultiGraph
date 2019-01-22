@@ -14,6 +14,7 @@ def accuracy_multilabel(preds, targs, threshold=0.5):
 
 
 def fbeta_score(preds, targs, beta=1., threshold=0.5):
+    preds = torch.sigmoid(preds)
     prec = precision(preds, targs, threshold=threshold)
     rec = recall(preds, targs, threshold=threshold)
     beta2 = beta * beta

@@ -5,9 +5,10 @@ from layers import GraphAttentionLayer, SpGraphAttentionLayer, GraphLinearLayer
 
 
 class GAT(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
+    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads, multilabel=False):
         """Dense version of GAT."""
         super(GAT, self).__init__()
+        self.multilabel = multilabel
         self.dropout = dropout
 
         self.attentions = [GraphAttentionLayer(
@@ -19,17 +20,20 @@ class GAT(nn.Module):
             nhid * nheads, nclass, dropout=dropout, alpha=alpha, concat=False)
 
     def forward(self, x, adj):
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = F.elu(self.out_att(x, adj))
-        return torch.sigmoid(x)
+        h = F.dropout(x, self.dropout, training=self.training)
+        h = torch.cat([att(h, adj) for att in self.attentions], dim=1)
+        h = F.dropout(h, self.dropout, training=self.training)
+        h = F.elu(self.out_att(h, adj))
+        if self.multilabel:
+            h = torch.sigmoid(h)
+        return h
 
 
 class SpGAT(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
+    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads, multilabel=False):
         """Sparse version of GAT."""
         super(SpGAT, self).__init__()
+        self.multilabel = multilabel
         self.dropout = dropout
 
         self.attentions = [SpGraphAttentionLayer(nfeat,
@@ -47,17 +51,20 @@ class SpGAT(nn.Module):
                                              concat=False)
 
     def forward(self, x, adj):
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = F.elu(self.out_att(x, adj))
-        return torch.sigmoid(x)
+        h = F.dropout(x, self.dropout, training=self.training)
+        h = torch.cat([att(h, adj) for att in self.attentions], dim=1)
+        h = F.dropout(h, self.dropout, training=self.training)
+        h = F.elu(self.out_att(h, adj))
+        if self.multilabel:
+            h = torch.sigmoid(h)
+        return h
 
 
 class SpGAT_inductive(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
+    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads, multilabel=False):
         """Sparse version of GAT with three Graph Attention layers."""
         super(SpGAT_inductive, self).__init__()
+        self.multilabel = multilabel
         self.dropout = dropout
         self.n_classes = nclass
         if len(nheads) == 1:
@@ -87,21 +94,24 @@ class SpGAT_inductive(nn.Module):
             self.add_module('out_attention_{}'.format(i), attention)
 
     def forward(self, x, adj):
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = torch.cat([att(x, adj) for att in self.attentions1], dim=1)
-        x = torch.cat([att(x, adj) for att in self.attentions2], dim=1)
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = torch.cat([att(x, adj).view(-1, self.n_classes, 1) for
+        h = F.dropout(x, self.dropout, training=self.training)
+        h = torch.cat([att(h, adj) for att in self.attentions1], dim=1)
+        h = torch.cat([att(h, adj) for att in self.attentions2], dim=1)
+        h = F.dropout(h, self.dropout, training=self.training)
+        h = torch.cat([att(h, adj).view(-1, self.n_classes, 1) for
                        att in self.out_attentions], dim=2)
-        logits = torch.mean(x, dim=2)
-        return torch.sigmoid(logits)
+        h = torch.mean(h, dim=2)
+        if self.multilabel:
+            h = torch.sigmoid(h)
+        return h
 
 
 class GCN(nn.Module):
-    def __init__(self, n_feat, n_classes, dropout, ch_list=None):
+    def __init__(self, n_feat, n_classes, dropout, ch_list=None, multilabel=False):
         """Implementation of Graph Convolutional Networks (Kipf and Welling, ICLR 2017)"""
         super(GCN, self).__init__()
         ch_list = ch_list or [n_feat, 256, 128]
+        self.multilabel = multilabel
         self.dropout = dropout
         self.gconvs = [GraphLinearLayer(ch_list[i], ch_list[i+1]) for i in range(len(ch_list)-1)]
         self.lin = GraphLinearLayer(ch_list[-1], n_classes)
@@ -113,4 +123,6 @@ class GCN(nn.Module):
         for gconv in self.gconvs:
             x = F.relu(gconv(x, adj))
         h = self.lin(x, adj)
-        return torch.sigmoid(h)
+        if self.multilabel:
+            h = torch.sigmoid(h)
+        return h
