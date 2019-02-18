@@ -69,7 +69,8 @@ if args.model == 'gat':
                       nclass=n_classes,
                       dropout=args.dropout,
                       nheads=n_heads,
-                      alpha=args.alpha)
+                      alpha=args.alpha,
+                      multilabel=True)
     else:
         model = GAT(nfeat=n_feat,
                     nhid=n_hidden,
@@ -78,7 +79,7 @@ if args.model == 'gat':
                     nheads=n_heads,
                     alpha=args.alpha)
 elif args.model == 'gcn':
-    model = GCN(n_feat, n_classes, args.dropout)
+    model = GCN(n_feat, n_classes, args.dropout, multilabel=True)
 optimizer = optim.Adam(model.parameters(),
                        lr=args.lr,
                        weight_decay=args.weight_decay)
@@ -92,6 +93,8 @@ n_val = ppi_data.val_adj.shape[0]
 n_test = ppi_data.test_adj.shape[0]
 n_nodes = ppi_data.train_adj.shape[1]
 f1_threshold = 0.5
+
+print("Number of graphs: train={}, val={}, test={}".format(n_train, n_val, n_test))
 
 
 def train(epoch):
